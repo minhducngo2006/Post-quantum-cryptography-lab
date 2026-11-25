@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==84.2.1", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pqclab"
+version = "0.1.0"
+description = "Post-quantum cryptography research and education lab"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+pqclab = "pqclab.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest==9.2.0", "ruff==0.17.6"]
+benchmark = ["matplotlib"]
+tui = ["textual"]
+fuzz = ["atheris; sys_platform == 'linux'"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

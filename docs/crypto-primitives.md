@@ -50,3 +50,10 @@ The test suite exercises all six enabled KEM/signature profiles, ML-KEM encapsul
 Private-key envelopes use Scrypt (N=2^15, r=8, p=1) to derive an AES-256-GCM key, a random 16-byte salt, a random 12-byte nonce, a versioned magic header, and authenticated caller-supplied associated data. The version/header and associated data are authenticated. Decryption fails closed on wrong passphrases, modified ciphertext, modified metadata, unknown versions, truncation, or malformed inputs.
 
 The file API creates encrypted files atomically with owner-only mode (0600), refuses to overwrite an existing file, and rejects symlinks or group/world-readable files on load. The passphrase is supplied by the caller and is never persisted by this library. This protects key material at rest but does not protect it while unlocked in process memory.
+
+
+## Streaming file encryption
+
+The streaming format uses a versioned 32-byte header, HKDF-SHA-256 key derivation, AES-256-GCM per chunk, a random per-file salt and nonce prefix, and a 64-bit chunk counter. The default chunk size is 4 MiB and the hard maximum plaintext size is 1 TiB. Each chunk authenticates its index, length, protocol header and caller-supplied associated data. An authenticated final record is mandatory; truncation, reordering, duplication, modification, context mismatch and trailing bytes are rejected.
+
+`decrypt_stream` spools authenticated chunks to a temporary file and publishes no plaintext to the destination until the final record and end-of-file are verified. The file helpers additionally create owner-only output files atomically and refuse to overwrite existing destinations. Use the file helpers when output publication must be all-or-nothing. The streaming functions operate on binary file-like objects; a failed encryption stream may contain a partial ciphertext and must be discarded.

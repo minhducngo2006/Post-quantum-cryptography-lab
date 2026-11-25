@@ -9,7 +9,10 @@ description = "Post-quantum cryptography research and education lab"
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
 license = "MIT"
-dependencies = []
+dependencies = [
+    "cryptography==50.0.2",
+    "liboqs-python==0.16.0.2",
+]
 
 [project.scripts]
 pqclab = "pqclab.cli:main"

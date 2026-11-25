@@ -51,6 +51,16 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ui() -> int:
+    try:
+        from .tui import run
+    except ImportError:
+        print("Install the TUI extra with uv sync --extra tui.", file=sys.stderr)
+        return 1
+    run()
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pqclab", description="Research-only PQC lab")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -59,11 +69,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     benchmark.add_argument("--iterations", type=int, required=True)
     benchmark.add_argument("--message-file", type=Path, required=True)
     benchmark.add_argument("--output-dir", type=Path, required=True)
+    commands.add_parser("ui", help="Open the interactive backend dashboard")
     args = parser.parse_args(argv)
     if args.command == "doctor":
         return _doctor()
     if args.command == "benchmark":
         return _benchmark(args)
+    if args.command == "ui":
+        return _ui()
     return 2
 
 

@@ -52,7 +52,7 @@ jobs:
       - name: Run tests
         run: |
           export OQS_INSTALL_PATH="$GITHUB_WORKSPACE/.native/liboqs"
-          uv run --locked --extra dev --extra benchmark pytest -q
+          uv run --locked --extra dev --extra benchmark --extra tui pytest -q
 
       - name: Ruff lint and formatting
         run: |

@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from pqclab.errors import CryptoFailure, FormatError, OutputExists
+from pqclab.file_security import fsync_directory, secure_private_file
 
 MAGIC = b"PQCS" + bytes((1, 0, 0, 0))
 HEADER_BYTES = 32
@@ -112,8 +113,6 @@ def encrypt_stream(
     _validate(shared_secret, associated_data, max_bytes)
     if not isinstance(chunk_size, int) or not 1 <= chunk_size <= MAX_CHUNK_SIZE:
         raise FormatError("Chunk size must be between one byte and 4 MiB.")
-
-    import os
 
     salt = os.urandom(SALT_BYTES)
     nonce_prefix = os.urandom(NONCE_PREFIX_BYTES)
@@ -217,7 +216,7 @@ def _publish_atomic(
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as output:
-            os.fchmod(output.fileno(), 0o600)
+            secure_private_file(output.fileno(), temporary)
             stats = writer(output)
             output.flush()
             os.fsync(output.fileno())
@@ -225,11 +224,11 @@ def _publish_atomic(
             os.link(temporary, target)
         except FileExistsError as exc:
             raise OutputExists("Refusing to overwrite an existing encrypted output.") from exc
-        directory_fd = os.open(target.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        except OSError as exc:
+            raise FormatError(
+                "Filesystem does not support atomic no-clobber output publication."
+            ) from exc
+        fsync_directory(target.parent)
         return stats
     finally:
         temporary.unlink(missing_ok=True)

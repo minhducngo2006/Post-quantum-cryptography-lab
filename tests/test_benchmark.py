@@ -1,7 +1,11 @@
 import csv
 import json
+from dataclasses import replace
+
+import pytest
 
 from pqclab.benchmark import export_benchmark, run_benchmarks
+from pqclab.errors import FormatError
 
 
 def test_benchmark_records_real_operations_and_exports_all_formats(tmp_path):
@@ -25,8 +29,13 @@ def test_benchmark_records_real_operations_and_exports_all_formats(tmp_path):
     payload = json.loads(output.json_path.read_text())
     rows = list(csv.DictReader(output.csv_path.open()))
     assert payload["iterations"] == 1
+    assert payload["environment"]["platform"]
+    assert payload["environment"]["machine"]
     assert len(rows) == len(result.metrics)
     assert output.chart_path.stat().st_size > 0
+    assert output.json_path.read_text().endswith("\n")
+    with pytest.raises(FormatError):
+        export_benchmark(replace(result, run_id="../escape"), tmp_path)
 
 
 def test_benchmark_rejects_invalid_iterations_and_empty_message():

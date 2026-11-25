@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import platform
+import re
 import statistics
 import time
 import uuid
@@ -46,6 +47,9 @@ class BenchmarkResult:
     created_at: str
     iterations: int
     python_version: str
+    platform_description: str
+    machine: str
+    processor: str
     native_version: str
     wrapper_version: str
     cryptography_version: str
@@ -59,6 +63,9 @@ class BenchmarkResult:
             "iterations": self.iterations,
             "environment": {
                 "python": self.python_version,
+                "platform": self.platform_description,
+                "machine": self.machine,
+                "processor": self.processor,
                 "liboqs": self.native_version,
                 "liboqs_python": self.wrapper_version,
                 "cryptography": self.cryptography_version,
@@ -111,6 +118,20 @@ def _metric(
         ciphertext_bytes=ciphertext_bytes,
         signature_bytes=signature_bytes,
     )
+
+
+def _processor_description() -> str:
+    processor = platform.processor() or platform.uname().processor
+    if processor or platform.system().lower() != "linux":
+        return processor
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8") as cpuinfo:
+            for line in cpuinfo:
+                if line.lower().startswith("model name"):
+                    return line.partition(":")[2].strip()
+    except OSError:
+        pass
+    return ""
 
 
 def run_benchmarks(*, iterations: int, message: bytes) -> BenchmarkResult:
@@ -208,6 +229,9 @@ def run_benchmarks(*, iterations: int, message: bytes) -> BenchmarkResult:
         created_at=datetime.now(UTC).isoformat(),
         iterations=iterations,
         python_version=platform.python_version(),
+        platform_description=platform.platform(),
+        machine=platform.machine(),
+        processor=_processor_description(),
         native_version=report.native_version or "",
         wrapper_version=report.wrapper_version or "",
         cryptography_version=report.pyca_version or "",
@@ -219,6 +243,22 @@ def export_benchmark(result: BenchmarkResult, output_dir: str | Path) -> Benchma
     """Export actual measurements to JSON, CSV and a latency chart in a unique run directory."""
     if not isinstance(result, BenchmarkResult):
         raise FormatError("Benchmark result has an invalid type.")
+    if (
+        not isinstance(result.run_id, str)
+        or re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}", result.run_id) is None
+    ):
+        raise FormatError("Benchmark result has an invalid run identifier.")
+    if not result.metrics:
+        raise FormatError("Benchmark result must contain at least one metric.")
+
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError as exc:
+        raise FormatError("Install the benchmark extra to generate charts.") from exc
+
     root = Path(output_dir)
     root.mkdir(parents=True, exist_ok=True)
     run_dir = root / result.run_id
@@ -236,14 +276,6 @@ def export_benchmark(result: BenchmarkResult, output_dir: str | Path) -> Benchma
             row = asdict(metric)
             row["samples_ns"] = ";".join(str(value) for value in metric.samples_ns)
             writer.writerow(row)
-
-    try:
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-    except ImportError as exc:
-        raise FormatError("Install the benchmark extra to generate charts.") from exc
 
     figure, axis = plt.subplots(figsize=(10, 5))
     labels = [metric.operation for metric in result.metrics]

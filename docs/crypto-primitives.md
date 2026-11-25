@@ -31,7 +31,7 @@ Hybrid signature profile: ML-DSA-65 + ECDSA-P256. Both signatures cover the same
 
 ## Secret-key handling
 
-Key-pair objects keep private byte fields out of their default repr, but they still hold plaintext secret material in process memory. Do not serialize, log, print or persist these values. Encrypted private-key storage and lifecycle controls belong to the key-management milestone and are not implemented by this primitive layer.
+Key-pair objects keep private byte fields out of their default repr, but they still hold plaintext secret material in process memory. Do not serialize, log, print or persist these values. The encrypted keystore API is implemented separately; passphrase acquisition, key rotation, secure deletion and memory zeroization are not implemented.
 
 ## Error behavior
 
@@ -42,14 +42,14 @@ Key-pair objects keep private byte fields out of their default repr, but they st
 
 ## Test coverage
 
-The test suite exercises all six enabled KEM/signature profiles, ML-KEM encapsulation/decapsulation, ML-DSA and SLH-DSA signing/verification, malformed inputs, X25519/P-256 ECDH, RSA-3072 OAEP/PSS, hybrid transcript/context binding, and hybrid signature dual-verification. Passing tests do not establish side-channel resistance or suitability for production use.
+The test suite exercises all enabled KEM/signature profiles, ML-KEM encapsulation/decapsulation, ML-DSA and SLH-DSA signing/verification, malformed inputs, X25519/P-256 ECDH, RSA-3072 OAEP/PSS, hybrid transcript/context binding, hybrid signature dual-verification, key fingerprints, encrypted keystore envelopes, streaming tamper/reorder/truncation, POSIX file-permission helpers and the security research scenarios. Passing tests do not establish side-channel resistance or suitability for production use.
 
 
 ## Encrypted private-key files
 
 Private-key envelopes use Scrypt (N=2^15, r=8, p=1) to derive an AES-256-GCM key, a random 16-byte salt, a random 12-byte nonce, a versioned magic header, and authenticated caller-supplied associated data. The version/header and associated data are authenticated. Decryption fails closed on wrong passphrases, modified ciphertext, modified metadata, unknown versions, truncation, or malformed inputs.
 
-The file API creates encrypted files atomically with owner-only mode (0600), refuses to overwrite an existing file, and rejects symlinks or group/world-readable files on load. The passphrase is supplied by the caller and is never persisted by this library. This protects key material at rest but does not protect it while unlocked in process memory.
+The file API creates encrypted files atomically and refuses to overwrite an existing file. On Linux it enforces owner-only mode (0600). Loading rejects symlinks, unexpected file identity changes, and group/world permissions. The passphrase is supplied by the caller and is never persisted by this library. This protects key material at rest but does not protect it while unlocked in process memory.
 
 
 ## Streaming file encryption

@@ -13,6 +13,11 @@ from .classical import (
     rsa_pss_sign,
     rsa_pss_verify,
 )
+from .fingerprints import (
+    fingerprint_matches,
+    hybrid_kem_public_key_fingerprint,
+    hybrid_signature_public_key_fingerprint,
+)
 from .hybrid import (
     DEFAULT_HYBRID_KEM,
     HybridCiphertext,
@@ -38,6 +43,12 @@ from .kem import (
     decapsulate,
     encapsulate,
     generate_kem_keypair,
+)
+from .keystore import (
+    decrypt_private_key,
+    encrypt_private_key,
+    load_private_key,
+    save_private_key,
 )
 from .signatures import (
     DEFAULT_SIGNATURE,
@@ -88,6 +99,7 @@ __all__ = [
     "encrypt_file",
     "encrypt_private_key",
     "encrypt_stream",
+    "fingerprint_matches",
     "generate_ecdh_keypair",
     "generate_hybrid_keypair",
     "generate_hybrid_signature_keypair",
@@ -96,7 +108,9 @@ __all__ = [
     "generate_signature_keypair",
     "hybrid_decapsulate",
     "hybrid_encapsulate",
+    "hybrid_kem_public_key_fingerprint",
     "hybrid_sign",
+    "hybrid_signature_public_key_fingerprint",
     "hybrid_verify",
     "load_private_key",
     "rsa_oaep_decrypt",

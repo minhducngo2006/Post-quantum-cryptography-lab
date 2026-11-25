@@ -9,7 +9,7 @@ OQS_INSTALL_PATH="$PWD/.native/liboqs" uv run --locked --extra benchmark pqclab 
   --output-dir ./benchmark-results
 ```
 
-The benchmark measures key generation, KEM encapsulation/decapsulation, signature key generation/signing/verification, and records latency, operations/second, message throughput, public/secret key sizes, ciphertext size and signature size. It executes real native cryptographic operations and self-checks the resulting shared secret and signature; it never inserts synthetic timing values.
+The benchmark measures key generation, KEM encapsulation/decapsulation, signature key generation/signing/verification, and records raw latency samples, mean/median latency, operations/second, message throughput, public/secret key sizes, ciphertext size and signature size. JSON metadata includes Python, OS/platform description, machine architecture, processor string, liboqs, liboqs-python and cryptography versions. It executes real native cryptographic operations and self-checks the resulting shared secret and signature; it never inserts synthetic timing values.
 
 Each invocation creates a unique run directory containing:
 - `results.json`: environment, parameters and raw samples

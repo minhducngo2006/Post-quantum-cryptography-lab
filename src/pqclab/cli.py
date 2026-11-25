@@ -51,6 +51,25 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _research(args: argparse.Namespace) -> int:
+    from .errors import LabError
+    from .research import export_security_report, run_security_research
+
+    try:
+        report = run_security_research()
+        output = export_security_report(report, args.output_dir)
+    except (OSError, LabError) as exc:
+        print(f"Security research failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"Research run: {report.run_id}")
+    for scenario in report.scenarios:
+        status = "PASS" if scenario.passed else "FAIL"
+        print(f"{status}: {scenario.scenario_id} — {scenario.observed}")
+    print(f"JSON: {output.json_path}")
+    print(f"Markdown: {output.markdown_path}")
+    return 0 if report.passed else 1
+
+
 def _ui() -> int:
     try:
         from .tui import run
@@ -69,12 +88,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     benchmark.add_argument("--iterations", type=int, required=True)
     benchmark.add_argument("--message-file", type=Path, required=True)
     benchmark.add_argument("--output-dir", type=Path, required=True)
+    research = commands.add_parser("research", help="Run isolated synthetic security experiments")
+    research.add_argument("--output-dir", type=Path, required=True)
     commands.add_parser("ui", help="Open the interactive backend dashboard")
     args = parser.parse_args(argv)
     if args.command == "doctor":
         return _doctor()
     if args.command == "benchmark":
         return _benchmark(args)
+    if args.command == "research":
+        return _research(args)
     if args.command == "ui":
         return _ui()
     return 2

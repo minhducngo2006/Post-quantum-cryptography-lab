@@ -240,3 +240,26 @@ def test_doctor_report_is_redacted(backend, monkeypatch):
     assert "passphrase" not in rendered.lower()
     assert "secret_key" not in rendered.lower()
     assert "private_key" not in rendered.lower()
+
+
+def test_native_library_candidates_cover_windows_wrapper_layout(backend, tmp_path, monkeypatch):
+    candidates = backend._native_library_candidates(tmp_path, "win32")
+    assert candidates == (
+        tmp_path / "bin" / "oqs.dll",
+        tmp_path / "bin" / "liboqs.dll",
+        tmp_path / "lib" / "oqs.dll",
+        tmp_path / "lib" / "liboqs.dll",
+    )
+
+    candidates[1].parent.mkdir(parents=True)
+    candidates[1].touch()
+    monkeypatch.setattr(backend, "_install_prefix", lambda: tmp_path)
+    monkeypatch.setattr(backend.sys, "platform", "win32")
+    assert backend._native_library_path() == candidates[1]
+
+
+def test_native_library_candidates_cover_macos_layout(backend, tmp_path):
+    assert backend._native_library_candidates(tmp_path, "darwin") == (
+        tmp_path / "lib" / "liboqs.dylib",
+        tmp_path / "lib64" / "liboqs.dylib",
+    )

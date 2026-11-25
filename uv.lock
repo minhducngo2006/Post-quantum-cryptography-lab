@@ -352,7 +352,7 @@ tui = [
 
 [package.metadata]
 requires-dist = [
-    { name = "atheris", marker = "sys_platform == 'linux' and extra == 'fuzz'" },
+    { name = "atheris", marker = "sys_platform == 'linux' and extra == 'fuzz'", specifier = "==3.1.0" },
     { name = "cryptography", specifier = "==50.0.2" },
     { name = "liboqs-python", specifier = "==0.16.0.2" },
     { name = "matplotlib", marker = "extra == 'benchmark'", specifier = "==3.11.2" },

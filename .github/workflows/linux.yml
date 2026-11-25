@@ -31,6 +31,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
+          version: "0.13.9"
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
@@ -39,7 +40,7 @@ jobs:
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends build-essential cmake ninja-build
+          sudo apt-get install --yes --no-install-recommends build-essential cmake ninja-build libssl-dev pkg-config
 
       - name: Provision pinned native backend
         run: bash scripts/provision-linux.sh
@@ -52,9 +53,17 @@ jobs:
       - name: Run tests
         run: |
           export OQS_INSTALL_PATH="$GITHUB_WORKSPACE/.native/liboqs"
-          uv run --locked --extra dev --extra benchmark --extra tui pytest -q
+          uv run --locked --extra dev --extra benchmark --extra tui --extra fuzz pytest -q
+
+      - name: Bounded streaming parser fuzz smoke
+        run: |
+          export OQS_INSTALL_PATH="$GITHUB_WORKSPACE/.native/liboqs"
+          uv run --locked --extra fuzz python scripts/fuzz_stream_parser.py -runs=100
 
       - name: Ruff lint and formatting
         run: |
           uv run --locked --extra dev ruff check .
           uv run --locked --extra dev ruff format --check .
+
+      - name: Build Python distributions
+        run: uv build --no-sources

@@ -1,3 +1,6 @@
+import os
+import subprocess
+
 import pytest
 
 from pqclab.crypto.keystore import (
@@ -54,7 +57,8 @@ def test_private_key_envelope_rejects_invalid_parameters():
 def test_private_key_file_is_owner_only_and_never_overwritten(tmp_path):
     path = tmp_path / "identity.pqkey"
     save_private_key(path, b"private-key", b"strong passphrase")
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o777 == 0o600
     assert load_private_key(path, b"strong passphrase") == b"private-key"
     with pytest.raises(OutputExists):
         save_private_key(path, b"replacement", b"strong passphrase")
@@ -65,10 +69,23 @@ def test_private_key_loader_rejects_symlinks_and_weak_permissions(tmp_path):
     real = tmp_path / "real.pqkey"
     save_private_key(real, b"private-key", b"strong passphrase")
     link = tmp_path / "linked.pqkey"
-    link.symlink_to(real)
-    with pytest.raises(FormatError):
-        load_private_key(link, b"strong passphrase")
+    try:
+        link.symlink_to(real)
+    except (OSError, NotImplementedError):
+        pass
+    else:
+        with pytest.raises(FormatError):
+            load_private_key(link, b"strong passphrase")
 
-    real.chmod(0o644)
+    if os.name == "nt":
+        subprocess.run(
+            ["icacls", str(real), "/grant", "*S-1-1-0:(F)"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    else:
+        real.chmod(0o644)
     with pytest.raises(FormatError):
         load_private_key(real, b"strong passphrase")

@@ -1,3 +1,4 @@
+import os
 from io import BytesIO
 
 import pytest
@@ -72,7 +73,8 @@ def test_streaming_file_api_is_atomic_private_and_no_overwrite(tmp_path):
     source.write_bytes(b"streamed payload" * 100)
 
     encrypt_file(source, encrypted, KEY, associated_data=b"file-id", chunk_size=128)
-    assert encrypted.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert encrypted.stat().st_mode & 0o777 == 0o600
     decrypt_file(encrypted, decrypted, KEY, associated_data=b"file-id")
     assert decrypted.read_bytes() == source.read_bytes()
 

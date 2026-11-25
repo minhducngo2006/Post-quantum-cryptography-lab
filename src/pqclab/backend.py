@@ -72,13 +72,34 @@ def _install_prefix() -> Path:
     return Path(__file__).resolve().parents[2] / ".native" / "liboqs"
 
 
+def _native_library_candidates(prefix: Path, platform_name: str) -> tuple[Path, ...]:
+    if platform_name == "win32":
+        return (
+            prefix / "bin" / "oqs.dll",
+            prefix / "bin" / "liboqs.dll",
+            prefix / "lib" / "oqs.dll",
+            prefix / "lib" / "liboqs.dll",
+        )
+    if platform_name == "darwin":
+        return (
+            prefix / "lib" / "liboqs.dylib",
+            prefix / "lib64" / "liboqs.dylib",
+        )
+    return (
+        prefix / "lib" / "liboqs.so",
+        prefix / "lib64" / "liboqs.so",
+    )
+
+
 def _native_library_path() -> Path | None:
-    prefix = _install_prefix()
-    for directory in ("lib", "lib64"):
-        candidate = prefix / directory / "liboqs.so"
-        if candidate.is_file():
-            return candidate
-    return None
+    return next(
+        (
+            candidate
+            for candidate in _native_library_candidates(_install_prefix(), sys.platform)
+            if candidate.is_file()
+        ),
+        None,
+    )
 
 
 def _enabled(library: ctypes.CDLL, symbol: str, algorithm: str) -> bool:
@@ -92,7 +113,10 @@ def _probe_native() -> _NativeProbe | None:
     path = _native_library_path()
     if path is None:
         return None
+    dll_directory = None
     try:
+        if os.name == "nt" and hasattr(os, "add_dll_directory"):
+            dll_directory = os.add_dll_directory(str(path.parent))
         library = ctypes.CDLL(str(path))
         version_function = library.OQS_version
         version_function.argtypes = []
@@ -118,6 +142,9 @@ def _probe_native() -> _NativeProbe | None:
         return _NativeProbe(version, enabled_kems, enabled_signatures)
     except (AttributeError, OSError, UnicodeDecodeError):
         return None
+    finally:
+        if dll_directory is not None:
+            dll_directory.close()
 
 
 def _installed_version(distribution: str) -> str | None:
@@ -229,8 +256,14 @@ def require_backend() -> None:
                 raise RuntimeError("Automatic native provisioning is disabled")
             return original_sleep(*args, **kwargs)
 
+        dll_directory = None
         try:
             os.environ["OQS_INSTALL_PATH"] = str(prefix)
+            if os.name == "nt" and hasattr(os, "add_dll_directory"):
+                native_path = _native_library_path()
+                if native_path is None:
+                    raise BackendUnavailable("Pinned Windows liboqs DLL is missing.")
+                dll_directory = os.add_dll_directory(str(native_path.parent))
             ctypes.util.find_library = find_only_provisioned_oqs
             subprocess.run = reject_automatic_provisioning
             time.sleep = reject_install_countdown
@@ -246,30 +279,48 @@ def require_backend() -> None:
             ctypes.util.find_library = original_find_library
             subprocess.run = original_run
             time.sleep = original_sleep
+            if dll_directory is not None:
+                dll_directory.close()
             if previous_install_path is None:
                 os.environ.pop("OQS_INSTALL_PATH", None)
             else:
                 os.environ["OQS_INSTALL_PATH"] = previous_install_path
 
-        if module.oqs_version() != EXPECTED_NATIVE_VERSION:
-            raise BackendUnavailable("Loaded liboqs version does not match the pinned release.")
-        if module.oqs_python_version() != EXPECTED_WRAPPER_VERSION:
-            raise BackendUnavailable(
-                "Loaded liboqs-python version does not match the pinned release."
-            )
+        try:
+            expected_library = _native_library_path()
+            loaded_name = getattr(module.native(), "_name", None)
+            if expected_library is None or not loaded_name:
+                raise BackendUnavailable("Could not verify the loaded native library path.")
+            if Path(loaded_name).resolve() != expected_library.resolve():
+                raise BackendUnavailable(
+                    "Loaded liboqs does not match the explicitly provisioned path."
+                )
+            if module.oqs_version() != EXPECTED_NATIVE_VERSION:
+                raise BackendUnavailable("Loaded liboqs version does not match the pinned release.")
+            if module.oqs_python_version() != EXPECTED_WRAPPER_VERSION:
+                raise BackendUnavailable(
+                    "Loaded liboqs-python version does not match the pinned release."
+                )
 
-        library_name = getattr(module.native(), "_name", "")
-        expected_library = _native_library_path()
-        if not expected_library or Path(str(library_name)).resolve() != expected_library.resolve():
+            enabled_kems = set(module.get_enabled_kem_mechanisms())
+            enabled_signatures = set(module.get_enabled_sig_mechanisms())
+            if not set(REQUIRED_KEMS).issubset(enabled_kems):
+                raise BackendUnavailable(
+                    "The loaded native library lacks the required ML-KEM profile."
+                )
+            if not set(REQUIRED_SIGNATURES).issubset(enabled_signatures):
+                raise BackendUnavailable(
+                    "The loaded native library lacks the required ML-DSA profile."
+                )
+        except BackendUnavailable:
+            sys.modules.pop("oqs", None)
+            sys.modules.pop("oqs.oqs", None)
+            raise
+        except (AttributeError, OSError, RuntimeError, ValueError) as exc:
+            sys.modules.pop("oqs", None)
+            sys.modules.pop("oqs.oqs", None)
             raise BackendUnavailable(
-                "liboqs-python did not load the explicitly provisioned library."
-            )
-
-        enabled_kems = set(module.get_enabled_kem_mechanisms())
-        enabled_signatures = set(module.get_enabled_sig_mechanisms())
-        if not set(REQUIRED_KEMS).issubset(enabled_kems):
-            raise BackendUnavailable("The loaded native library lacks the required ML-KEM profile.")
-        if not set(REQUIRED_SIGNATURES).issubset(enabled_signatures):
-            raise BackendUnavailable("The loaded native library lacks the required ML-DSA profile.")
+                "The loaded liboqs backend failed post-import validation."
+            ) from exc
 
         _OQS_MODULE = module

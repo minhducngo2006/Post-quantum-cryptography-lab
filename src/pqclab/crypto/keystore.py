@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import stat
 import tempfile
 from pathlib import Path
 
@@ -12,6 +11,12 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from pqclab.errors import CryptoFailure, FormatError, OutputExists
+from pqclab.file_security import (
+    fsync_directory,
+    open_private_file,
+    secure_private_file,
+    verify_private_file,
+)
 
 MAGIC = b"PQK" + bytes((1,))
 SALT_BYTES = 16
@@ -114,7 +119,7 @@ def save_private_key(
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as stream:
-            os.fchmod(stream.fileno(), 0o600)
+            secure_private_file(stream.fileno(), temporary)
             stream.write(envelope)
             stream.flush()
             os.fsync(stream.fileno())
@@ -122,11 +127,11 @@ def save_private_key(
             os.link(temporary, target)
         except FileExistsError as exc:
             raise OutputExists("Refusing to overwrite an existing private key file.") from exc
-        directory_fd = os.open(target.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        except OSError as exc:
+            raise FormatError(
+                "Filesystem does not support atomic no-clobber private-key publication."
+            ) from exc
+        fsync_directory(target.parent)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -143,10 +148,8 @@ def load_private_key(
         metadata = target.lstat()
     except FileNotFoundError as exc:
         raise FormatError("Private key file does not exist.") from exc
-    if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
-        raise FormatError("Private key file must be regular and accessible only by its owner.")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(target, flags)
+    verify_private_file(target, metadata)
+    descriptor = open_private_file(target, metadata)
     with os.fdopen(descriptor, "rb") as stream:
         envelope = stream.read(
             MAX_PRIVATE_KEY_BYTES + len(MAGIC) + SALT_BYTES + NONCE_BYTES + TAG_BYTES + 1

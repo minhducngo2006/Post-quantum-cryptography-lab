@@ -1,11 +1,89 @@
 """Cryptographic primitives exposed by the lab."""
 
-from .kem import DEFAULT_KEM, KEM_ALGORITHMS
-from .signatures import DEFAULT_SIGNATURE, SIGNATURE_ALGORITHMS
+from .classical import (
+    ECDHKeyPair,
+    RSAKeyPair,
+    ecdh_exchange,
+    ecdsa_p256_sign,
+    ecdsa_p256_verify,
+    generate_ecdh_keypair,
+    generate_rsa_keypair,
+    rsa_oaep_decrypt,
+    rsa_oaep_encrypt,
+    rsa_pss_sign,
+    rsa_pss_verify,
+)
+from .hybrid import (
+    DEFAULT_HYBRID_KEM,
+    HybridCiphertext,
+    HybridKeyPair,
+    HybridPublicKey,
+    generate_hybrid_keypair,
+    hybrid_decapsulate,
+    hybrid_encapsulate,
+)
+from .hybrid_signatures import (
+    DEFAULT_HYBRID_SIGNATURE,
+    HybridSignature,
+    HybridSignatureKeyPair,
+    HybridSignaturePublicKey,
+    generate_hybrid_signature_keypair,
+    hybrid_sign,
+    hybrid_verify,
+)
+from .kem import (
+    DEFAULT_KEM,
+    KEM_ALGORITHMS,
+    KEMKeyPair,
+    decapsulate,
+    encapsulate,
+    generate_kem_keypair,
+)
+from .signatures import (
+    DEFAULT_SIGNATURE,
+    SIGNATURE_ALGORITHMS,
+    SignatureKeyPair,
+    generate_signature_keypair,
+    sign,
+    verify,
+)
 
 __all__ = [
+    "DEFAULT_HYBRID_KEM",
+    "DEFAULT_HYBRID_SIGNATURE",
     "DEFAULT_KEM",
     "DEFAULT_SIGNATURE",
     "KEM_ALGORITHMS",
     "SIGNATURE_ALGORITHMS",
+    "ECDHKeyPair",
+    "HybridCiphertext",
+    "HybridKeyPair",
+    "HybridPublicKey",
+    "HybridSignature",
+    "HybridSignatureKeyPair",
+    "HybridSignaturePublicKey",
+    "KEMKeyPair",
+    "RSAKeyPair",
+    "SignatureKeyPair",
+    "decapsulate",
+    "ecdh_exchange",
+    "ecdsa_p256_sign",
+    "ecdsa_p256_verify",
+    "encapsulate",
+    "generate_ecdh_keypair",
+    "generate_hybrid_keypair",
+    "generate_hybrid_signature_keypair",
+    "generate_kem_keypair",
+    "generate_rsa_keypair",
+    "generate_signature_keypair",
+    "hybrid_decapsulate",
+    "hybrid_encapsulate",
+    "hybrid_sign",
+    "hybrid_verify",
+    "rsa_oaep_decrypt",
+    "rsa_oaep_encrypt",
+    "rsa_pss_sign",
+    "rsa_pss_verify",
+    "sign",
+    "verify",
 ]
